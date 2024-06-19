@@ -11,18 +11,51 @@ pygame.display.set_caption("Bouncing Ball")
 WHITE = (255, 255, 255)  # Color for ball
 GRAY = (128, 128, 128)  # Color for paddle
 
+first_iteration = True
+score_display_active = False
+score = 0
+
 
 def draw_objects(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, paddle_height):
   """
-  Draws the ball and paddle on the screen.
+  Draws the ball, paddle, and score (if active) on the screen.
   """
   pygame.draw.rect(screen, WHITE, (ball_x, ball_y, ball_width, ball_height))
   pygame.draw.rect(screen, GRAY, (paddle_x, paddle_y, paddle_width, paddle_height))
 
+  if score_display_active:
+    draw_score_display(score)
 
-def handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_speed, delta_time):
+
+def draw_score_display(score):
   """
-  Updates the ball's position based on speed and delta time, handling collisions with walls.
+  Draws a temporary score display on the screen with a fading effect.
+  """
+  font = pygame.font.Font(None, 50)  # Choose a system font or load a custom font
+  score_text = font.render("+" + str(score), True, (255, 255, 255))  # White text
+
+  # Get screen size
+  screen_width, screen_height = screen.get_size()
+
+  # Calculate text position based on screen size
+  text_x = (screen_width - score_text.get_width()) // 2
+  text_y = (screen_height - score_text.get_height()) // 2
+
+  # Create a transparent surface for the score display
+  alpha = int(255 - score_display_time * 2.55)  # Adjust fade speed (higher = faster fade)
+  score_surface = pygame.Surface(score_text.get_size(), pygame.SRCALPHA)  # Transparent
+  score_surface.fill((0, 0, 0, alpha))  # Fill with transparent black with fading alpha
+
+  # Blit text onto the transparent surface
+  score_surface.blit(score_text, (0, 0))
+
+  # Blit the score surface with fading effect onto the main screen
+  screen.blit(score_surface, (text_x, text_y))
+
+
+def handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_speed, delta_time, first_iteration):
+  """
+  Updates the ball's position based on speed and delta time, handling collisions with walls and setting a random starting x-position on respawn.
   """
   ball_x += x_speed * delta_time
   ball_y += y_speed * delta_time
@@ -31,13 +64,15 @@ def handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_spe
   if ball_x <= 0 or ball_x + ball_width >= width:
     x_speed = -x_speed
 
-  # Check for top/bottom screen collision and bounce with randomness
+  # Check for top screen collision and bounce with randomness
   if ball_y <= 0:
     ball_y = 0
     y_speed = -y_speed * (1 + random.uniform(-0.1, 0.1))  # Bounce with randomness
+
+  # Respawn ball with random x-position (within screen bounds) and keep y-position fixed
   elif ball_y + ball_height >= height:
-    ball_y = height - ball_height
-    y_speed = -y_speed * (1 + random.uniform(-0.1, 0.1))  # Bounce with randomness
+    ball_x = random.randint(ball_width // 2, width - ball_width // 2)  # Ensures ball stays within screen
+    ball_y = 100  # Adjust this value for your desired fixed y-position
 
   return ball_x, ball_y, x_speed, y_speed
 
@@ -56,12 +91,15 @@ def handle_paddle_movement(paddle_x, paddle_y, paddle_width, mouse_x):
 
 def handle_collisions(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, y_speed):
   """
-  Checks for ball collision with the paddle and updates y-speed if collision occurs.
-  (Optional: Can be extended to include more collision handling)
+  Checks for ball collision with the paddle and updates y-speed and score if collision occurs.
   """
   if ball_x + ball_width >= paddle_x and ball_x <= paddle_x + paddle_width and \
      ball_y + ball_height >= paddle_y:
-    y_speed = -y_speed
+    y_speed = -y_speed  # Bounce the ball
+    global score  # Access global score variable
+    score += 1  # Increase score on successful paddle hit
+    score_display_active = True  # Activate score display
+    score_display_time = 0  # Reset timer
 
   return y_speed
 
@@ -73,7 +111,7 @@ async def main():
   ball_width = 50
   ball_height = 20
   x_speed = 5  # Adjust for desired horizontal speed
-  y_speed = 30  # Adjust for desired vertical speed
+  y_speed = 60  # Adjust for desired vertical speed
   running = True
   rect_initialized = False
   clock = pygame.time.Clock()  # Create a clock object
@@ -84,6 +122,10 @@ async def main():
   # Paddle start position
   paddle_x = 0
   paddle_y = 400
+
+  score = 0  # Initialize score to 0
+  score_display_active = False  # Flag to track score display visibility
+  score_display_time = 0  # Timer for score display duration
 
   while running:
     for event in pygame.event.get():
@@ -100,8 +142,8 @@ async def main():
       ball_y = 100  # Initialize on first iteration only
       rect_initialized = True
 
-    # Update ball position and handle collisions
-    ball_x, ball_y, x_speed, y_speed = handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_speed, delta_time)
+    # Update ball position and handle collisions (call handle_ball_movement only once)
+    ball_x, ball_y, x_speed, y_speed = handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_speed, delta_time, first_iteration)
     y_speed = handle_collisions(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, y_speed)
 
     # Update paddle position
@@ -110,6 +152,13 @@ async def main():
 
     # Draw objects on screen
     draw_objects(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, paddle_height)
+
+    # Update score display timer
+    score_display_time += delta_time
+
+    # Deactivate score display if fade-out timer elapses
+    if score_display_time > 1:  # Adjust fade-out duration (higher = longer fade)
+      score_display_active = False
 
     pygame.display.flip()
 
