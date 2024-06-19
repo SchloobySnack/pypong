@@ -11,6 +11,61 @@ pygame.display.set_caption("Bouncing Ball")
 WHITE = (255, 255, 255)  # Color for ball
 GRAY = (128, 128, 128)  # Color for paddle
 
+
+def draw_objects(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, paddle_height):
+  """
+  Draws the ball and paddle on the screen.
+  """
+  pygame.draw.rect(screen, WHITE, (ball_x, ball_y, ball_width, ball_height))
+  pygame.draw.rect(screen, GRAY, (paddle_x, paddle_y, paddle_width, paddle_height))
+
+
+def handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_speed, delta_time):
+  """
+  Updates the ball's position based on speed and delta time, handling collisions with walls.
+  """
+  ball_x += x_speed * delta_time
+  ball_y += y_speed * delta_time
+
+  # Check for left/right screen collision and bounce
+  if ball_x <= 0 or ball_x + ball_width >= width:
+    x_speed = -x_speed
+
+  # Check for top/bottom screen collision and bounce with randomness
+  if ball_y <= 0:
+    ball_y = 0
+    y_speed = -y_speed * (1 + random.uniform(-0.1, 0.1))  # Bounce with randomness
+  elif ball_y + ball_height >= height:
+    ball_y = height - ball_height
+    y_speed = -y_speed * (1 + random.uniform(-0.1, 0.1))  # Bounce with randomness
+
+  return ball_x, ball_y, x_speed, y_speed
+
+
+def handle_paddle_movement(paddle_x, paddle_y, paddle_width, mouse_x):
+  """
+  Updates the paddle's position based on mouse movement, ensuring it stays within screen bounds.
+  """
+  paddle_x = mouse_x - paddle_width // 2  # Center paddle rectangle on cursor
+
+  # Ensure paddle rectangle stays within screen bounds (x-axis)
+  paddle_x = max(0, min(paddle_x, width - paddle_width))
+
+  return paddle_x, paddle_y
+
+
+def handle_collisions(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, y_speed):
+  """
+  Checks for ball collision with the paddle and updates y-speed if collision occurs.
+  (Optional: Can be extended to include more collision handling)
+  """
+  if ball_x + ball_width >= paddle_x and ball_x <= paddle_x + paddle_width and \
+     ball_y + ball_height >= paddle_y:
+    y_speed = -y_speed
+
+  return y_speed
+
+
 async def main():
   # Game variables
   ball_x = 100
@@ -26,6 +81,9 @@ async def main():
   # Additional rectangle for mouse tracking
   paddle_width = 200  # Adjust width of gray rectangle
   paddle_height = 20
+  # Paddle start position
+  paddle_x = 0
+  paddle_y = 400
 
   while running:
     for event in pygame.event.get():
@@ -42,49 +100,16 @@ async def main():
       ball_y = 100  # Initialize on first iteration only
       rect_initialized = True
 
-    # Update ball position using delta_time
-    ball_x += x_speed * delta_time
-    ball_y += y_speed * delta_time
+    # Update ball position and handle collisions
+    ball_x, ball_y, x_speed, y_speed = handle_ball_movement(ball_x, ball_y, ball_width, ball_height, x_speed, y_speed, delta_time)
+    y_speed = handle_collisions(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, y_speed)
 
-    # Check for left/right screen collision and bounce
-    if ball_x <= 0 or ball_x + ball_width >= width:
-      x_speed = -x_speed  # Invert x-speed for bounce
+    # Update paddle position
+    mouse_x, _ = pygame.mouse.get_pos()  # Only need x-coordinate
+    paddle_x, paddle_y = handle_paddle_movement(paddle_x, paddle_y, paddle_width, mouse_x)
 
-    # Check for top/bottom screen collision and bounce with randomness
-    if ball_y <= 0:
-      ball_y = 0
-      y_speed = -y_speed * (1 + random.uniform(-0.1, 0.1))  # Bounce with randomness
-    elif ball_y + ball_height >= height:
-      ball_y = height - ball_height
-      y_speed = -y_speed * (1 + random.uniform(-0.1, 0.1))  # Bounce with randomness
-
-    # Get mouse position
-    mouse_x, mouse_y = pygame.mouse.get_pos()
-
-    # Update paddle position based on mouse_x
-    paddle_x = mouse_x - paddle_width // 2  # Center paddle rectangle on cursor
-
-    # Ensure paddle rectangle stays within screen bounds (x-axis)
-    paddle_x = max(0, min(paddle_x, width - paddle_width))
-
-    # Constrain paddle rectangle to bottom of screen with 10% buffer
-    buffer_amount = height * 0.1  # Calculate 10% of screen height
-    paddle_y = height - paddle_height - buffer_amount
-
-    # Ball and paddle collision detection (improved)
-    if ball_x + ball_width >= paddle_x and ball_x <= paddle_x + paddle_width and \
-       ball_y + ball_height >= paddle_y:
-      # Bounce on y-axis
-      y_speed = -y_speed
-
-      # Optional: Calculate ball's new x-speed based on collision point
-      # This can add a more realistic bouncing effect
-      collision_point = ball_x + (ball_width // 2) - (paddle_x + (paddle_width // 2))
-      x_speed = x_speed * (1 + collision_point / (paddle_width / 2))
-
-    # Draw rectangles
-    pygame.draw.rect(screen, WHITE, (ball_x, ball_y, ball_width, ball_height))
-    pygame.draw.rect(screen, WHITE, (paddle_x, paddle_y, paddle_width, paddle_height))
+    # Draw objects on screen
+    draw_objects(ball_x, ball_y, ball_width, ball_height, paddle_x, paddle_y, paddle_width, paddle_height)
 
     pygame.display.flip()
 
